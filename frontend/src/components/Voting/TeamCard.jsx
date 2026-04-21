@@ -31,6 +31,16 @@ const TeamCard = ({ team, pollId, criteria, hasVoted, onVoteSuccess }) => {
     return values.length > 0 ? sum / values.length : 0;
   };
 
+  // ✅ FIX 1: Agar pehle se vote hua hai toh card flip hone se rokna
+  const handleCardClick = () => {
+    if (isLocked || isFlipped) return;
+    if (hasVoted) {
+      showPopup('already_voted');
+      return;
+    }
+    setIsFlipped(true);
+  };
+
   const handleSubmit = async () => {
     const allRated = criteria.every(c => ratings[c.name] > 0);
 
@@ -60,15 +70,20 @@ const TeamCard = ({ team, pollId, criteria, hasVoted, onVoteSuccess }) => {
       }, 2000);
     } catch (error) {
       const msg = error.response?.data?.message || '';
+      const status = error.response?.status;
+
+      // ✅ FIX 2: Sirf 400 + "already voted" message pe hi already_voted popup
       if (
-        error.response?.status === 400 &&
+        status === 400 &&
         (msg.toLowerCase().includes('already voted') || msg.toLowerCase().includes('already vote'))
       ) {
         showPopup('already_voted');
         setIsFlipped(false);
         if (onVoteSuccess) onVoteSuccess();
       } else {
-        showPopup('already_voted');
+        // ✅ FIX 3: Baaki errors ke liye generic error — already_voted popup nahi
+        console.error('Vote submission error:', msg || error.message);
+        alert(msg || 'Vote submit karne mein error aaya. Please dobara try karein.');
       }
     } finally {
       setLoading(false);
@@ -102,7 +117,7 @@ const TeamCard = ({ team, pollId, criteria, hasVoted, onVoteSuccess }) => {
           animate={isFlipped ? 'back' : 'front'}
           variants={cardVariants}
           transition={{ duration: 0.6, type: 'spring' }}
-          onClick={() => !isLocked && !isFlipped && setIsFlipped(true)}
+          onClick={handleCardClick}
         >
           {/* Front Side */}
           <div className="card-face card-front">
