@@ -59,14 +59,44 @@ const CreatePoll = ({ onPollCreated }) => {
     setFormData({ ...formData, criteria: newCriteria });
   };
 
+  // ✅ FIX: datetime-local gives "YYYY-MM-DDTHH:mm" without timezone info.
+  // new Date() on that string treats it as UTC — but user typed LOCAL time (IST).
+  // We convert it to a proper ISO string with local timezone offset preserved.
+  const toLocalISOString = (datetimeLocalValue) => {
+    if (!datetimeLocalValue) return '';
+    // new Date treats "YYYY-MM-DDTHH:mm" as LOCAL time correctly in most browsers
+    // but to be safe, we manually build the date from local parts
+    const date = new Date(datetimeLocalValue);
+    // toISOString() gives UTC — instead send the offset-aware string
+    const tzOffset = -date.getTimezoneOffset(); // in minutes
+    const sign = tzOffset >= 0 ? '+' : '-';
+    const pad = (n) => String(Math.floor(Math.abs(n))).padStart(2, '0');
+    return (
+      date.getFullYear() +
+      '-' + pad(date.getMonth() + 1) +
+      '-' + pad(date.getDate()) +
+      'T' + pad(date.getHours()) +
+      ':' + pad(date.getMinutes()) +
+      ':00' +
+      sign + pad(tzOffset / 60) + ':' + pad(tzOffset % 60)
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await axios.post('/api/admin/polls', formData);
+      // ✅ Convert both times to timezone-aware ISO strings before sending
+      const payload = {
+        ...formData,
+        startTime: toLocalISOString(formData.startTime),
+        endTime: toLocalISOString(formData.endTime),
+      };
+
+      await axios.post('/api/admin/polls', payload);
       showToast('Poll created successfully!', 'success');
-      
+
       // Reset form
       setFormData({
         title: '',
@@ -97,7 +127,7 @@ const CreatePoll = ({ onPollCreated }) => {
         )}
       </AnimatePresence>
 
-      <motion.div 
+      <motion.div
         className="create-poll-form"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -107,7 +137,7 @@ const CreatePoll = ({ onPollCreated }) => {
       <form onSubmit={handleSubmit}>
         <div className="form-section">
           <h3>Basic Information</h3>
-          
+
           <div className="input-group">
             <label>Poll Title *</label>
             <input
