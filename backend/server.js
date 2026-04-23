@@ -70,6 +70,8 @@
 
 // Corrected File is Below ...
 
+
+
 /**
  * ╔══════════════════════════════════════════╗
  * ║       SMART VOTING SYSTEM - Backend      ║
@@ -89,48 +91,48 @@ dotenv.config();
 
 const app = express();
 
-// Connect to MongoDB
 connectDB();
 
-// ✅ FIXED CORS - Only allow exact known origins, NO Postman/curl bypass
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  process.env.FRONTEND_URL, // Set your exact Vercel URL in Render env vars
+  'https://smartvotingsystem.vercel.app',
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
-    // ❌ REMOVED: "no origin" bypass that allowed Postman/curl
-    // Now requests without an origin (Postman, curl) are BLOCKED
+    // Block requests with NO origin (Postman, curl) — except OPTIONS preflight
     if (!origin) {
       return callback(new Error('Direct API access not allowed'));
     }
-
-    // ✅ Only exact matches — no more .endsWith('.vercel.app') wildcard
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
-
     return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+// Apply CORS to all routes
+app.use(cors(corsOptions));
+
+// Handle OPTIONS preflight properly — this fixes the "preflight 500" error
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/polls', pollRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Something went wrong!' });
@@ -139,5 +141,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
